@@ -1,0 +1,323 @@
+import random
+import threading
+import tkinter as tk
+from tkinter import ttk
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from flask import Flask, jsonify, request
+from datetime import datetime, timedelta
+
+#=================================Super key gen    ============================
+import tkinter as tk
+from tkinter import simpledialog, messagebox
+from flask import Flask, jsonify, request
+from cryptography.fernet import Fernet
+import json
+
+SUPER_PASSWORD = "Priyan"
+
+def ask_super_key():
+    root = tk.Tk()
+    root.withdraw()  # Hide the root window
+    password = simpledialog.askstring("Authentication", "Enter Super Key:", show='*')
+    if password != SUPER_PASSWORD:
+        messagebox.showerror("Access Denied", "Incorrect Password!")
+        exit()
+    root.destroy()
+
+# ==================== Encryption Setup ==================== #
+# Generate and store the key once (do not change it unless resetting encryption)
+encryption_key = Fernet.generate_key()
+
+# 🔒 Save the key to a file so it can be reused later for decryption
+with open("encryption.key", "wb") as key_file:
+    key_file.write(encryption_key)
+
+# Use the key to create a cipher
+cipher_suite = Fernet(encryption_key)
+
+def encrypt_data(data):
+    json_data = json.dumps(data).encode()
+    encrypted = cipher_suite.encrypt(json_data)
+    return encrypted
+
+def decrypt_data(encrypted_data):
+    decrypted = cipher_suite.decrypt(encrypted_data).decode()
+    return json.loads(decrypted)
+
+
+app = Flask(__name__)
+
+is_active = True  # Default: ON
+blacklisted_sensors = []  # Store blacklisted sensor names
+
+# ======================== Sensor Data Generation ========================= #
+def generate_sensor_data():
+    """Generates sensor data dynamically with n sensors."""
+    if not is_active:
+        return {}
+    
+    data = {}
+    for i in range(1, 101):
+        is_healthy = random.choice([True, False])  # Randomly mix healthy and unhealthy sensors
+        
+        healthy_data = {
+            "S.No": str(i),
+            "Device Name": f"Siemens SITRANS TS500{i} --- DT{i}", 
+            "Temperature Reading": round(random.uniform(-50.0, 180), 1), 
+            "Minimum Recorded Temperature": round(random.uniform(-200, 0), 2), 
+            "Maximum Recorded Temperature": round(random.uniform(70, 160), 2), 
+            "Ambient Temperature": round(random.uniform(15.0, 33.0), 1), 
+            "Power Consumption": round(random.uniform(1.5, 3.0), 1), 
+            "Voltage Supply": "24.0", "Signal Strength": random.randint(80, 100),
+            "Data Transmission Interval": "Every 5 seconds",
+            "Sensor Sensitivity": round(random.uniform(0.8, 1.2), 2),
+            "Response Time": round(random.uniform(1.0, 5.0), 1), 
+            "Accuracy": round(random.uniform(98.0, 99.9), 2), 
+            "Battery Level": random.randint(80, 100), 
+            "Error Codes": "None", "Data Transmission Rate": round(random.uniform(10.0, 50.0), 1), 
+            "Humidity Level": round(random.uniform(30.0, 70.0), 1), 
+            "Pressure": round(random.uniform(900, 999), 1), 
+            "Altitude": round(random.uniform(0, 5000), 1), 
+            "Vibration Level": round(random.uniform(0.1, 2.0), 2), 
+            "Firmware Version": "v7.12.17", "Operational Status": random.choice(["Active", "Idle"]),
+            "Sensor Health Status": "Normal", 
+            "Calibration Status": "Up-to-date", 
+            "Last Calibration Date": "2025-01-12", 
+            "Last Maintenance Date": datetime.today().strftime("%Y-%m-%d")
+        }
+        
+        unhealthy_data = {
+            "S.No": str(i),
+            "Device Name": f"Siemens SITRANS TS500{i} --- DT{i}",
+            "Temperature Reading": round(random.uniform(-300.0, 2000.0), 1),
+            "Minimum Recorded Temperature": round(random.uniform(-400, 10), 2),
+            "Maximum Recorded Temperature": round(random.uniform(50, 2000), 2),
+            "Ambient Temperature": round(random.uniform(-10.0, 60.0), 1),
+            "Power Consumption": round(random.uniform(4.0, 10.0), 1),
+            "Voltage Supply": "24.0", "Signal Strength": random.randint(80, 100),
+            "Data Transmission Interval": "Every 5 seconds",
+            "Signal Strength": random.randint(30, 70),
+            "Sensor Sensitivity": round(random.uniform(0.5, 0.7), 2),
+            "Response Time": round(random.uniform(40, 60), 1),
+            "Accuracy": round(random.uniform(10.0, 60.0), 2),
+            "Battery Level": random.randint(0, 10),
+            "Error Codes": random.choice(["ERR01", "ERR02", "ERR03", "Critical Fault"]),
+            "Data Transmission Rate": round(random.uniform(0, 5.0)),
+            "Humidity Level": round(random.uniform(70.0, 90.0), 1),
+            "Pressure": round(random.uniform(1000, 1200), 1),
+            "Altitude": round(random.uniform(-500, 6000), 1),
+            "Vibration Level": round(random.uniform(3.0, 10.0), 2),
+            "Firmware Version": "v7.12.15",
+            "Operational Status": random.choice(["Faulty", "Idle"]),
+            "Sensor Health Status": random.choice(["Warning", "Critical"]),
+            "Calibration Status": "Needs Calibration",
+            "Last Calibration Date": "2023-01-12",
+            "Last Maintenance Date": "2024-01-24"
+        }
+        
+        data[f"Sensor {i}"] = healthy_data if is_healthy else unhealthy_data
+    
+    return data
+
+# ======================== API Routes ========================= #
+
+@app.route("/sensor-data", methods=["GET"])
+def get_sensor_data():
+    """Returns sensor data and marks blacklisted S.No sensors as 'Faulty'."""
+    global blacklisted_sensors
+    data = generate_sensor_data()
+
+    for sensor_id, sensor_info in data.items():
+        if str(sensor_info["S.No"]) in blacklisted_sensors:  # Convert to string for consistency
+            sensor_info["Operational Status"] = "Faulty"
+    encrypted = encrypt_data(data)
+    return encrypted
+    #return jsonify(data)
+
+@app.route("/blacklist", methods=["POST"])
+def receive_blacklist():
+    """Receives blacklisted sensor S.No values and updates the global list."""
+    global blacklisted_sensors
+    blacklisted_sensors = request.json.get("blacklist", [])
+    print(f"\n🚨 Full Blacklist Data Received: {blacklisted_sensors}")  # Debugging
+    return jsonify({"status": "Blacklist updated", "blacklisted_sensors": blacklisted_sensors})
+
+
+@app.route("/toggle", methods=["POST"])
+def toggle_sensor():
+    """Toggles the on/off state of sensors."""
+    global is_active
+    is_active = not is_active
+    return jsonify({"status": "ON" if is_active else "OFF"})
+
+# ======================== Tkinter GUI for Sensor Dashboard ========================= #
+class SensorDashboard:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Sensor Data Visualization")
+        self.root.configure(bg="lightgray")
+
+        self.sensor_data = generate_sensor_data()
+        self.current_sensor = "Sensor 1"
+
+        self.fig, self.ax = plt.subplots(figsize=(12, 8))
+        self.canvas = FigureCanvasTkAgg(self.fig, master=root)
+        self.canvas.get_tk_widget().pack()
+
+        ttk.Label(root, text="Search Sensor (1-100):", background="lightgray").pack()
+        self.search_entry = ttk.Entry(root)
+        self.search_entry.pack()
+        search_button = ttk.Button(root, text="Search", command=self.search_sensor)
+        search_button.pack()
+
+        self.update_chart()
+
+    def update_chart(self):
+        """Updates the sensor data visualization."""
+        self.sensor_data = generate_sensor_data()
+        if self.current_sensor in self.sensor_data:
+            sensor_info = self.sensor_data[self.current_sensor]
+            data_keys = [key for key in sensor_info.keys() if isinstance(sensor_info[key], (int, float))]
+            data_values = [sensor_info[key] for key in data_keys]
+
+            self.ax.clear()
+            self.ax.barh(data_keys, data_values, color="cornflowerblue", edgecolor="black")
+            self.ax.set_xlabel("Values")
+            self.ax.set_title(f"{self.current_sensor} Data")
+
+            self.ax.set_yticks(range(len(data_keys)))  
+            self.ax.set_yticklabels(data_keys, rotation=0, ha="right")
+
+            plt.tight_layout()
+            self.canvas.draw()
+
+        self.root.after(5000, self.update_chart)  
+
+    def search_sensor(self):
+        """Search for a sensor and update the chart."""
+        search_query = f"Sensor {self.search_entry.get()}"
+        if search_query in self.sensor_data:
+            self.current_sensor = search_query
+            self.update_chart()
+        else:
+            print("Sensor not found!")
+
+# ======================== Gantt Chart for Sensor Status ========================= #
+class GanttChart:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Sensor Operational Timeline")
+
+        self.sensor_data = generate_sensor_data()
+        self.fig, self.ax = plt.subplots(figsize=(12, 8))
+        self.canvas = FigureCanvasTkAgg(self.fig, master=root)
+        self.canvas.get_tk_widget().pack()
+        
+        self.update_gantt()
+
+    def update_gantt(self):
+        """Updates the Gantt chart with sensor operational statuses."""
+        self.sensor_data = generate_sensor_data()
+        self.ax.clear()
+        statuses = {"Active": "orange", "Idle": "gray", "Faulty": "blue"}
+        now = datetime.now()
+
+        for idx, (sensor, info) in enumerate(self.sensor_data.items()):
+            start_time = now - timedelta(minutes=random.randint(1, 60))
+            end_time = now
+            color = statuses.get(info["Operational Status"], "gray")
+            self.ax.barh(sensor, (end_time - start_time).seconds / 60, left=start_time, color=color, edgecolor="black")
+
+        self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        self.ax.set_xlabel("Time")
+        self.ax.set_title("Sensor Operational Status Timeline")
+        self.canvas.draw()
+        self.root.after(5000, self.update_gantt)
+
+# ======================== Blacklist Visualization ========================= #
+import pandas as pd
+
+class BlacklistVisualization:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Blacklisted Sensors Visualization")
+
+        self.fig, self.ax = plt.subplots(figsize=(12, 6))
+        self.canvas = FigureCanvasTkAgg(self.fig, master=root)
+        self.canvas.get_tk_widget().pack()
+
+        self.refresh_button = ttk.Button(root, text="Refresh", command=self.update_blacklist_chart)
+        self.refresh_button.pack()
+
+        self.update_blacklist_chart()
+        self.root.after(5000, self.auto_refresh)
+
+    def update_blacklist_chart(self):
+        """Displays the blacklist data as a clear sensor visualization."""
+        global blacklisted_sensors
+
+        self.ax.clear()
+        if not blacklisted_sensors:
+            self.ax.set_title("No Turned Off Sensors", fontsize=14, fontweight='bold', color="gray")
+        else:
+            df = pd.DataFrame(blacklisted_sensors)  # Convert to DataFrame
+            df.sort_values("Probability_Value", ascending=False, inplace=True)  # Sort by risk
+
+            # Convert "S.No" to strings to use as labels
+            df["S.No"] = df["S.No"].astype(str)
+
+            # Define colors based on risk level
+            color_map = {"Low Risk": "yellow", "Medium Risk": "orange", "High Risk": "red"}
+            colors = df["Risk_Level"].map(color_map).fillna("gray")
+
+            # Plot bar chart with sensor numbers as labels
+            bars = self.ax.bar(df["S.No"], df["Temperature Reading"], color=colors, edgecolor="black")
+
+            # Add values on top of bars
+            for bar, label in zip(bars, df["Temperature Reading"]):
+                self.ax.text(
+                    bar.get_x() + bar.get_width() / 2,  # Center of the bar
+                    bar.get_height(),  # Top of the bar
+                    f"{label}°C",  # Display temperature value
+                    ha='center', va='bottom', fontsize=10, fontweight='bold', color="black"
+                )
+
+            # Set axis labels & title
+            self.ax.set_xlabel("Sensor Number (S.No)", fontsize=12, fontweight='bold')
+            self.ax.set_ylabel("Temperature Reading (°C)", fontsize=12, fontweight='bold')
+            self.ax.set_title("🚨 Turned Off Sensors - Blacklist 🚨", fontsize=14, fontweight='bold', color="darkred")
+
+            # Add a legend
+            handles = [plt.Line2D([0], [0], color=color, lw=4) for color in color_map.values()]
+            labels = list(color_map.keys())
+            self.ax.legend(handles, labels, title="Risk Levels")
+
+        self.canvas.draw()
+
+    def auto_refresh(self):
+        """Auto-refresh the graph every 5 seconds."""
+        self.update_blacklist_chart()
+        self.root.after(5000, self.auto_refresh)
+
+# ======================== Main Application ========================= #
+if __name__ == "__main__":
+    ask_super_key()
+    flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False), daemon=True)
+    flask_thread.start()
+
+    root = tk.Tk()
+    app1 = SensorDashboard(root)
+    
+    gantt_root = tk.Toplevel(root)
+    app2 = GanttChart(gantt_root)
+    
+    blacklist_root = tk.Toplevel(root)
+    app3 = BlacklistVisualization(blacklist_root)
+
+    root.mainloop()
+
+
+
