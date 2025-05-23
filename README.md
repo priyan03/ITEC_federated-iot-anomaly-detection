@@ -42,7 +42,27 @@ This project simulates an IoT environment with 100 industrial temperature sensor
 - **Tools**: Git, GitHub, VS Code
 
 ---
+## How to run the code.
 
+1) Open Vscode (python)  create two new files and then paste the "IoT Malware detection using FL & ML" in file 1, "DT based sample Temperature sensor" in file 2.
+2) Install Required Packages
+   Open your terminal and run: pip install -r requirements.txt
+3) Run the Server :
+    run the "DT based sample Temperature sensor"  file 2 
+4) Run the Client :
+    run the "IoT Malware detection using FL & ML" file 1 in new terminal.
+
+Usage
+
+Start the Flask server.
+Authenticate with the super key.
+Monitor, extract, classify, and visualize data.
+View saved outputs in the LOCAL LIST and Risk classification folders.
+
+
+
+
+---
 ## License
 
 This project is licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0).
