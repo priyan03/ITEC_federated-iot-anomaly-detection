@@ -45,9 +45,10 @@ This project simulates an IoT environment with 100 industrial temperature sensor
 
 ## License
 
-This project is dedicated to the public domain under the Creative Commons CC0 1.0 Universal license.  
-See the [LICENSE](LICENSE) file for details.  
-You are free to use, modify, and distribute this project without restriction.
+This project is licensed under the MIT License.
+© 2025 Priyan Paul Samuel P
+
+You are free to use, modify, and distribute this project, provided you include this copyright notice and give proper credit.
 
 
 ## 🚀 Installation
